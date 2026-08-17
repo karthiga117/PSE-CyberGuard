@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyberguard"
+version = "0.1.0"
+description = "CyberGuard - A cybersecurity domain-specific language for PenTesting, AppSec, and Cloud Security"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{name = "CyberGuard Contributors"}]
+license = {text = "MIT"}
+keywords = ["cybersecurity", "dsl", "domain-specific-language", "pentest", "appsec", "cloud-security"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "typer[all]>=0.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+cyberguard = "cyberguard.cli:app"
+
+[project.urls]
+Repository = "https://github.com/karthiga117/PSE-CyberGuard"
+Documentation = "https://github.com/karthiga117/PSE-CyberGuard#readme"
+Issues = "https://github.com/karthiga117/PSE-CyberGuard/issues"
+
+[tool.setuptools]
+packages = ["cyberguard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 100
+target-version = ['py311', 'py312', 'py313']
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "W", "I"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true

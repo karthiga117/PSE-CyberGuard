@@ -1,12 +1,17 @@
 """CyberGuard CLI - Command-line interface for the cybersecurity DSL."""
 
-import typer
 from typing import Optional
+
+import typer
+
 from cyberguard import __version__
 
 app = typer.Typer(
     name="cyberguard",
-    help="CyberGuard - A cybersecurity domain-specific language for PenTesting, AppSec, and Cloud Security.",
+    help=(
+        "CyberGuard - A cybersecurity domain-specific language "
+        "for PenTesting, AppSec, and Cloud Security."
+    ),
 )
 
 
@@ -31,7 +36,7 @@ def main(
 ) -> None:
     """
     CyberGuard - A cybersecurity domain-specific language (DSL).
-    
+
     Use 'cyberguard COMMAND --help' for more information on a command.
     """
     if ctx.invoked_subcommand is None and version is None:
@@ -44,10 +49,10 @@ def run(
 ) -> None:
     """
     Execute a CyberGuard DSL file.
-    
+
     Args:
         file: Path to the CyberGuard DSL file (.cg)
-    
+
     Example:
         cyberguard run examples/authentication.cg
     """

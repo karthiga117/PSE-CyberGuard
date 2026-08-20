@@ -75,7 +75,10 @@ class Token:
     column: int
 
     def __str__(self) -> str:
-        return f"Token(type={self.type.value}, value={self.value!r}, line={self.line}, column={self.column})"
+        return (
+            f"Token(type={self.type.value}, value={self.value!r}, "
+            f"line={self.line}, column={self.column})"
+        )
 
 
 KEYWORDS = TokenType.keyword_values()

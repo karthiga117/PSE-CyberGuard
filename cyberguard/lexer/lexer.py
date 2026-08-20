@@ -60,9 +60,20 @@ class Lexer:
                     raise LexerError("Inconsistent indentation", line_number, 1, raw_line)
 
             content = line_content[leading_spaces:]
-            line_tokens = self._tokenize_line(content, line_number, leading_spaces + 1)
+            line_tokens = self._tokenize_line(
+                content,
+                line_number,
+                leading_spaces + 1,
+            )
             tokens.extend(line_tokens)
-            tokens.append(Token(TokenType.NEWLINE, "\n", line_number, len(content) + leading_spaces + 1))
+            tokens.append(
+                Token(
+                    TokenType.NEWLINE,
+                    "\n",
+                    line_number,
+                    len(content) + leading_spaces + 1,
+                )
+            )
 
             self.index = line_end
             if self.index < len(self.source) and self.source[self.index] == "\n":
@@ -105,7 +116,12 @@ class Lexer:
                 index += 1
                 continue
             if ch == "#":
-                raise LexerError("Unexpected character '#'", line_number, start_column + index, text)
+                raise LexerError(
+                    "Unexpected character '#'",
+                    line_number,
+                    start_column + index,
+                    text,
+                )
             if ch in ('"', "'"):
                 token, index = self._read_string(text, index, line_number, start_column)
                 tokens.append(token)
@@ -115,8 +131,20 @@ class Lexer:
                 while index < len(text) and text[index].isdigit():
                     index += 1
                 if index < len(text) and (text[index].isalpha() or text[index] == "_"):
-                    raise LexerError(f"Invalid integer literal {text[start:index + 1]!r}", line_number, start_column + start, text)
-                tokens.append(Token(TokenType.INTEGER, text[start:index], line_number, start_column + start))
+                    raise LexerError(
+                        f"Invalid integer literal {text[start:index + 1]!r}",
+                        line_number,
+                        start_column + start,
+                        text,
+                    )
+                tokens.append(
+                    Token(
+                        TokenType.INTEGER,
+                        text[start:index],
+                        line_number,
+                        start_column + start,
+                    )
+                )
                 continue
             if ch.isalpha() or ch == "_":
                 start = index
@@ -127,21 +155,41 @@ class Lexer:
                     parts = [word]
                     while index < len(text) and text[index] == "-":
                         index += 1
-                        if index >= len(text) or not (text[index].isalpha() or text[index] == "_"):
-                            raise LexerError(f"Invalid identifier {'-'.join(parts)!r}", line_number, start_column + start, text)
+                        if index >= len(text) or not (
+                            text[index].isalpha() or text[index] == "_"
+                        ):
+                            raise LexerError(
+                                f"Invalid identifier {'-'.join(parts)!r}",
+                                line_number,
+                                start_column + start,
+                                text,
+                            )
                         part_start = index
-                        while index < len(text) and (text[index].isalnum() or text[index] == "_"):
+                        while index < len(text) and (
+                            text[index].isalnum() or text[index] == "_"
+                        ):
                             index += 1
                         parts.append(text[part_start:index])
                     candidate = "-".join(parts)
                     if candidate in KEYWORD_MAP:
-                        tokens.append(Token(TokenType.KEYWORD, candidate, line_number, start_column + start))
+                        tokens.append(
+                            Token(TokenType.KEYWORD, candidate, line_number, start_column + start)
+                        )
                         continue
-                    raise LexerError(f"Invalid identifier {candidate!r}", line_number, start_column + start, text)
+                    raise LexerError(
+                        f"Invalid identifier {candidate!r}",
+                        line_number,
+                        start_column + start,
+                        text,
+                    )
                 if word in KEYWORD_MAP:
-                    tokens.append(Token(TokenType.KEYWORD, word, line_number, start_column + start))
+                    tokens.append(
+                        Token(TokenType.KEYWORD, word, line_number, start_column + start)
+                    )
                 else:
-                    tokens.append(Token(TokenType.IDENTIFIER, word, line_number, start_column + start))
+                    tokens.append(
+                        Token(TokenType.IDENTIFIER, word, line_number, start_column + start)
+                    )
                 continue
             if text.startswith("==", index):
                 tokens.append(Token(TokenType.OPERATOR, "==", line_number, start_column + index))
@@ -152,24 +200,58 @@ class Lexer:
                 index += 2
                 continue
             if ch == "=":
-                raise LexerError("Standalone '=' is not supported in CyberGuard v0.1", line_number, start_column + index, text)
+                raise LexerError(
+                    "Standalone '=' is not supported in CyberGuard v0.1",
+                    line_number,
+                    start_column + index,
+                    text,
+                )
             if ch == ":":
                 tokens.append(Token(TokenType.OPERATOR, ":", line_number, start_column + index))
                 index += 1
                 continue
-            raise LexerError(f"Unexpected character {ch!r}", line_number, start_column + index, text)
+            raise LexerError(
+                f"Unexpected character {ch!r}",
+                line_number,
+                start_column + index,
+                text,
+            )
         return tokens
 
-    def _read_string(self, text: str, index: int, line_number: int, start_column: int) -> tuple[Token, int]:
+    def _read_string(
+        self,
+        text: str,
+        index: int,
+        line_number: int,
+        start_column: int,
+    ) -> tuple[Token, int]:
         quote = text[index]
         value_chars: list[str] = []
         idx = index + 1
         while idx < len(text):
             ch = text[idx]
             if ch == quote:
-                return Token(TokenType.STRING, "".join(value_chars), line_number, start_column + index), idx + 1
+                return (
+                    Token(
+                        TokenType.STRING,
+                        "".join(value_chars),
+                        line_number,
+                        start_column + index,
+                    ),
+                    idx + 1,
+                )
             if ch in {"\n", "\r"}:
-                raise LexerError("Unterminated string literal", line_number, start_column + index, text)
+                raise LexerError(
+                    "Unterminated string literal",
+                    line_number,
+                    start_column + index,
+                    text,
+                )
             value_chars.append(ch)
             idx += 1
-        raise LexerError("Unterminated string literal", line_number, start_column + index, text)
+        raise LexerError(
+            "Unterminated string literal",
+            line_number,
+            start_column + index,
+            text,
+        )

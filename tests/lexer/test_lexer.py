@@ -437,7 +437,12 @@ class TestLexerEdgeCases:
         """Trailing whitespace is ignored."""
         lexer = Lexer("target: web   \n")
         tokens = lexer.tokenize()
-        keywords = [t for t in tokens if t.type == TokenType.KEYWORD and t.value in ("target", "web")]
+        keywords = [
+            t
+            for t in tokens
+            if t.type == TokenType.KEYWORD
+            and t.value in ("target", "web")
+        ]
         assert len(keywords) >= 2
 
     def test_invalid_three_space_indentation(self):

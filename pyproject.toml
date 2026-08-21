@@ -47,8 +47,8 @@ Repository = "https://github.com/karthiga117/PSE-CyberGuard"
 Documentation = "https://github.com/karthiga117/PSE-CyberGuard#readme"
 Issues = "https://github.com/karthiga117/PSE-CyberGuard/issues"
 
-[tool.setuptools]
-packages = ["cyberguard"]
+[tool.setuptools.packages.find]
+include = ["cyberguard*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

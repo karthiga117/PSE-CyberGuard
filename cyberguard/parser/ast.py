@@ -70,6 +70,7 @@ class RequestStatement:
 
     method: str  # GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
     source_location: SourceLocation
+    path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -146,6 +147,7 @@ class TestBlock:
         ...,
     ]
     source_location: SourceLocation
+    name: str | None = None
 
     __test__ = False
 
@@ -157,6 +159,8 @@ class TargetBlock:
     kind: str  # web or cloud
     body: tuple[TestBlock | ResourceStatement | InspectionStatement, ...]
     source_location: SourceLocation
+    url: str | None = None
+    provider: str | None = None
 
 
 @dataclass(frozen=True)

@@ -13,4 +13,6 @@ __version__ = "0.1.0"
 __author__ = "CyberGuard Contributors"
 __license__ = "MIT"
 
-__all__ = ["__version__"]
+from .semantic import SemanticError, SemanticValidator
+
+__all__ = ["__version__", "SemanticError", "SemanticValidator"]

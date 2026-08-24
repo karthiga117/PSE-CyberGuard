@@ -300,16 +300,19 @@ class Parser:
         """Parse a comparison expression."""
         start_loc = self._current_location()
 
-        # Parse left side (identifier)
-        if self._current().type != TokenType.IDENTIFIER:
+        # Parse left side (identifier or keyword-backed property names such as status/header/body)
+        token = self._current()
+        if token.type == TokenType.IDENTIFIER or (
+            token.type == TokenType.KEYWORD and token.value in {"status", "header", "body"}
+        ):
+            left_name = token.value
+            self._advance()
+        else:
             raise ParserError(
-                f"Expected identifier in comparison expression, got {self._current().value}",
-                self._current().line,
-                self._current().column,
+                f"Expected identifier in comparison expression, got {token.value}",
+                token.line,
+                token.column,
             )
-
-        left_name = self._current().value
-        self._advance()
 
         # Parse operator
         if self._current().type != TokenType.OPERATOR or self._current().value not in (

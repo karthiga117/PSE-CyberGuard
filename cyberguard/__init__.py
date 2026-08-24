@@ -13,6 +13,18 @@ __version__ = "0.1.0"
 __author__ = "CyberGuard Contributors"
 __license__ = "MIT"
 
+from .execution import ExecutionEngine, ExecutionResult, ExecutionStatus
+from .execution.http_client import HttpClient, HttpResponse, UrllibHttpClient
 from .semantic import SemanticError, SemanticValidator
 
-__all__ = ["__version__", "SemanticError", "SemanticValidator"]
+__all__ = [
+    "__version__",
+    "SemanticError",
+    "SemanticValidator",
+    "ExecutionEngine",
+    "ExecutionResult",
+    "ExecutionStatus",
+    "HttpClient",
+    "HttpResponse",
+    "UrllibHttpClient",
+]

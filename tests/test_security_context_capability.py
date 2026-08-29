@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
+
+import pytest
+
 from cyberguard import ExecutionResult, ExecutionStatus, SecurityCapability, SecurityContext
 from cyberguard.execution.result import HttpRequestSpec, HttpResponseCapture
 from cyberguard.parser.ast import RequestStatement, SourceLocation
@@ -138,3 +142,13 @@ def test_security_context_and_execution_result_are_separate_models() -> None:
     assert security_context.capability == "timeout-check"
     assert security_context.execution_result is not None
     assert security_context.execution_result.error == "request timed out"
+
+
+def test_security_context_is_frozen() -> None:
+    context = SecurityContext(
+        target="https://example.com",
+        test="login-check",
+    )
+
+    with pytest.raises(FrozenInstanceError):
+        context.target = "https://other.example.com"

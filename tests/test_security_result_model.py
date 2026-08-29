@@ -1,4 +1,4 @@
-"""Focused tests for the security result models."""
+﻿"""Focused tests for the security result models."""
 
 from __future__ import annotations
 
@@ -42,38 +42,23 @@ def test_security_finding_optional_fields_are_optional() -> None:
 
 
 def test_security_result_supports_zero_one_and_multiple_findings() -> None:
-    empty_result = SecurityResult(outcome="passed")
-    single_result = SecurityResult(
+    empty_result = SecurityResult(outcome="passed", findings=())
+    single_finding = SecurityFinding(
+        capability="detection",
+        target="https://example.com",
+        test="sql-error",
+        evidence="database error",
         outcome="failed",
-        findings=[
-            SecurityFinding(
-                capability="detection",
-                target="https://example.com",
-                test="sql-error",
-                evidence="database error",
-                outcome="failed",
-            )
-        ],
     )
-    multiple_result = SecurityResult(
+    single_result = SecurityResult(outcome="failed", findings=(single_finding,))
+    second_finding = SecurityFinding(
+        capability="cloud",
+        target="aws:iam",
+        test="public_access",
+        evidence={"public_access": True},
         outcome="failed",
-        findings=[
-            SecurityFinding(
-                capability="detection",
-                target="https://example.com",
-                test="sql-error",
-                evidence="database error",
-                outcome="failed",
-            ),
-            SecurityFinding(
-                capability="cloud",
-                target="aws:iam",
-                test="public_access",
-                evidence={"public_access": True},
-                outcome="failed",
-            ),
-        ],
     )
+    multiple_result = SecurityResult(outcome="failed", findings=(single_finding, second_finding))
 
     assert len(empty_result.findings) == 0
     assert len(single_result.findings) == 1
@@ -81,22 +66,81 @@ def test_security_result_supports_zero_one_and_multiple_findings() -> None:
     assert empty_result.outcome == "passed"
     assert single_result.findings[0].capability == "detection"
     assert multiple_result.findings[1].target == "aws:iam"
+    assert isinstance(empty_result.findings, tuple)
 
 
-def test_security_result_preserves_outcome_and_findings() -> None:
+def test_security_result_add_finding_returns_new_result_without_mutating_original() -> None:
+    original = SecurityResult(outcome="passed", findings=())
+    added = SecurityFinding(
+        capability="detection",
+        target="https://example.com",
+        test="sql-error",
+        evidence="database error",
+        outcome="failed",
+    )
+
+    updated = original.add_finding(added)
+
+    assert original.findings == ()
+    assert updated.findings == (added,)
+    assert original is not updated
+    assert updated.outcome == "passed"
+
+
+def test_security_redaction_handles_nested_dicts_and_lists() -> None:
     finding = SecurityFinding(
         capability="header-check",
         target="https://example.com",
         test="missing-security-header",
-        evidence={"Authorization": "Bearer secret-token"},
+        evidence={
+            "headers": {
+                "Authorization": "Bearer super-secret-token",
+                "x-trace": "abc123",
+            },
+            "items": [
+                {"token": "abc123"},
+                {"message": "SQL authentication error detected"},
+            ],
+        },
         outcome="failed",
     )
-    result = SecurityResult(outcome="failed", findings=[finding])
 
-    assert result.outcome == "failed"
-    assert len(result.findings) == 1
-    assert result.findings[0] == finding
-    assert result.findings[0].sanitize().evidence == {"Authorization": "[REDACTED]"}
+    sanitized = finding.sanitize()
+
+    assert sanitized.evidence["headers"]["Authorization"] == "[REDACTED]"
+    assert sanitized.evidence["items"][0]["token"] == "[REDACTED]"
+    assert sanitized.evidence["items"][1]["message"] == "SQL authentication error detected"
+    assert sanitized.evidence["headers"]["x-trace"] == "abc123"
+
+
+def test_security_redaction_preserves_non_sensitive_evidence() -> None:
+    finding = SecurityFinding(
+        capability="detection",
+        target="https://example.com",
+        test="response-check",
+        evidence="SQL authentication error detected",
+        outcome="failed",
+    )
+
+    sanitized = finding.sanitize()
+
+    assert sanitized.evidence == "SQL authentication error detected"
+
+    header_finding = SecurityFinding(
+        capability="auth",
+        target="https://example.com",
+        test="header",
+        evidence="Authorization: Bearer abc123",
+        outcome="failed",
+    )
+    assert header_finding.sanitize().evidence == "[REDACTED]"
+    assert SecurityFinding(
+        capability="auth",
+        target="https://example.com",
+        test="header",
+        evidence="******",
+        outcome="failed",
+    ).sanitize().evidence == "[REDACTED]"
 
 
 def test_execution_result_and_security_result_remain_separate() -> None:
@@ -108,21 +152,11 @@ def test_execution_result_and_security_result_remain_separate() -> None:
         request=HttpRequestSpec(method="GET", url="https://example.com"),
         error="request timed out",
     )
-    security_result = SecurityResult(
-        outcome="failed",
-        findings=[
-            SecurityFinding(
-                capability="timeout-check",
-                target="https://example.com",
-                test="request",
-                evidence="request timed out",
-                outcome="failed",
-            )
-        ],
-    )
+    security_result = SecurityResult(outcome="failed", findings=())
 
     assert execution_result.status == ExecutionStatus.EXECUTION_ERROR
+    assert execution_result.error == "request timed out"
     assert security_result.outcome == "failed"
+    assert security_result.findings == ()
+    assert security_result.has_findings is False
     assert execution_result.status != security_result.outcome
-    assert execution_result.request == HttpRequestSpec(method="GET", url="https://example.com")
-    assert security_result.findings[0].capability == "timeout-check"

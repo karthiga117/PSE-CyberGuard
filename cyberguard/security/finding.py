@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
 _SENSITIVE_KEYS = (
     "authorization",
-    "auth",
     "token",
     "secret",
     "password",
@@ -16,18 +16,23 @@ _SENSITIVE_KEYS = (
     "apikey",
 )
 
+_AUTH_HEADER_RE = re.compile(
+    r"(?i)(authorization\s*:\s*(?:bearer|basic)\s+[A-Za-z0-9._~+\-/=]+)"
+)
+_BEARER_TOKEN_RE = re.compile(r"(?i)\b(?:bearer\s+[A-Za-z0-9._~+/\-=]+)\b")
+_MASKED_TOKEN_RE = re.compile(r"(?i)(?:\*{4,}|\*\*\*\*+)")
+
 
 def _redact_sensitive(value: Any) -> Any:
     """Return a minimally redacted copy of structured security evidence."""
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
         for key, item in value.items():
-            if isinstance(key, str) and any(
-                sensitive in key.lower() for sensitive in _SENSITIVE_KEYS
-            ):
-                redacted[key] = "[REDACTED]"
+            key_name = str(key).lower()
+            if any(sensitive in key_name for sensitive in _SENSITIVE_KEYS):
+                redacted[str(key)] = "[REDACTED]"
             else:
-                redacted[key] = _redact_sensitive(item)
+                redacted[str(key)] = _redact_sensitive(item)
         return redacted
 
     if isinstance(value, list):
@@ -37,10 +42,9 @@ def _redact_sensitive(value: Any) -> Any:
         return tuple(_redact_sensitive(item) for item in value)
 
     if isinstance(value, str):
-        lowered = value.lower()
-        if any(sensitive in lowered for sensitive in _SENSITIVE_KEYS):
+        if _AUTH_HEADER_RE.search(value) or _BEARER_TOKEN_RE.search(value):
             return "[REDACTED]"
-        if "authorization:" in lowered or "bearer " in lowered:
+        if _MASKED_TOKEN_RE.search(value):
             return "[REDACTED]"
         return value
 

@@ -15,6 +15,7 @@ __license__ = "MIT"
 
 from .execution import ExecutionEngine, ExecutionResult, ExecutionStatus
 from .execution.http_client import HttpClient, HttpResponse, UrllibHttpClient
+from .security import SecurityFinding, SecurityResult
 from .semantic import SemanticError, SemanticValidator
 
 __all__ = [
@@ -27,4 +28,6 @@ __all__ = [
     "HttpClient",
     "HttpResponse",
     "UrllibHttpClient",
+    "SecurityFinding",
+    "SecurityResult",
 ]

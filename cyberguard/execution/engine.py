@@ -20,6 +20,7 @@ from cyberguard.parser.ast import (
     TestBlock,
     WithStatement,
 )
+from cyberguard.security.capability import compare_status
 
 
 class ExecutionEngine:
@@ -191,11 +192,7 @@ class ExecutionEngine:
 
     def _compare_status(self, actual: int, expected: int, operator: str) -> bool:
         """Compare status code values using the supported operators."""
-        if operator == "==":
-            return actual == expected
-        if operator == "!=":
-            return actual != expected
-        return False
+        return compare_status(actual, expected, operator)
 
     def _build_url(self, base_url: str, path: str | None) -> str:
         """Construct the runtime URL from the target URL and request path."""

@@ -6,9 +6,21 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from cyberguard import ExecutionResult, ExecutionStatus, SecurityCapability, SecurityContext
+from cyberguard import (
+    ExecutionResult,
+    ExecutionStatus,
+    HttpAssertionCapability,
+    SecurityCapability,
+    SecurityContext,
+)
 from cyberguard.execution.result import HttpRequestSpec, HttpResponseCapture
-from cyberguard.parser.ast import RequestStatement, SourceLocation
+from cyberguard.parser.ast import (
+    ComparisonExpression,
+    IdentifierValue,
+    IntegerLiteral,
+    RequestStatement,
+    SourceLocation,
+)
 from cyberguard.security import SecurityFinding, SecurityResult
 
 
@@ -152,3 +164,31 @@ def test_security_context_is_frozen() -> None:
 
     with pytest.raises(FrozenInstanceError):
         context.target = "https://other.example.com"
+
+
+def test_http_assertion_capability_supports_execute_contract() -> None:
+    capability = HttpAssertionCapability()
+    comparison = ComparisonExpression(
+        left=IdentifierValue(
+            name="status",
+            source_location=SourceLocation(line=1, column=1),
+        ),
+        operator="==",
+        right=IntegerLiteral(
+            value=200,
+            source_location=SourceLocation(line=1, column=8),
+        ),
+        source_location=SourceLocation(line=1, column=1),
+    )
+    context = SecurityContext(
+        target="https://example.com",
+        test="status == 200",
+        response=HttpResponseCapture(status_code=200, headers={}, body="ok"),
+    )
+
+    result = capability.execute(comparison, context)
+
+    assert result.outcome == "passed"
+    assert result.passed is True
+    assert result.findings[0].outcome == "passed"
+    assert result.findings[0].actual == 200

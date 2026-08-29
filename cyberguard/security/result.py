@@ -32,3 +32,11 @@ class SecurityResult:
     @property
     def total_findings(self) -> int:
         return len(self.findings)
+
+    @property
+    def passed(self) -> bool:
+        return self.outcome == "passed"
+
+    @property
+    def failed(self) -> bool:
+        return self.outcome == "failed"

@@ -25,7 +25,6 @@ from cyberguard.security.capability import (
     BasicAuthenticationCapability,
     HttpAssertionCapability,
     SecurityCapability,
-    prepare_basic_auth_request,
 )
 from cyberguard.security.context import SecurityContext
 
@@ -110,6 +109,11 @@ class ExecutionEngine:
 
         url = self._build_url(target_url, getattr(request, "path", None))
         headers: dict[str, str] = {}
+        if (
+            self.default_security_context is not None
+            and self.default_security_context.original_request is not None
+        ):
+            headers = dict(self.default_security_context.original_request.headers)
         request_spec = HttpRequestSpec(method=request.method, url=url, headers=headers)
 
         auth_statement = self._find_authentication_statement(test)
@@ -121,6 +125,19 @@ class ExecutionEngine:
                 capability=auth_statement.method,
             )
             auth_result = self.authentication_capability.evaluate(auth_statement, auth_context)
+            if auth_result.outcome == "inconclusive":
+                return ExecutionResult(
+                    status=ExecutionStatus.EXECUTION_ERROR,
+                    target_kind="web",
+                    target_url=target_url,
+                    test_name=getattr(test, "name", None),
+                    request=request_spec,
+                    message=(
+                        "The authentication capability could not prepare the request. "
+                        "Only basic authentication is supported for this Phase 4 flow."
+                    ),
+                    error="Authentication preparation was inconclusive.",
+                )
             if auth_result.outcome == "failed":
                 return ExecutionResult(
                     status=ExecutionStatus.EXECUTION_ERROR,
@@ -132,9 +149,21 @@ class ExecutionEngine:
                     error="Basic authentication credentials are missing or invalid.",
                 )
             if auth_result.outcome == "passed":
-                prepared_request = prepare_basic_auth_request(request_spec, auth_context.payload)
-                if prepared_request is not None:
-                    request_spec = prepared_request
+                prepared_request = self.authentication_capability.prepare_request(
+                    request_spec,
+                    auth_context.payload,
+                )
+                if prepared_request is None:
+                    return ExecutionResult(
+                        status=ExecutionStatus.EXECUTION_ERROR,
+                        target_kind="web",
+                        target_url=target_url,
+                        test_name=getattr(test, "name", None),
+                        request=request_spec,
+                        message="The basic authentication request could not be prepared.",
+                        error="Authentication preparation returned no request.",
+                    )
+                request_spec = prepared_request
 
         try:
             response = self.http_client.request(

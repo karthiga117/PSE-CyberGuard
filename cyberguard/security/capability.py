@@ -86,29 +86,29 @@ def _extract_basic_auth_credentials(payload: object) -> tuple[str | None, str | 
     return (str(username), str(password))
 
 
-def prepare_basic_auth_request(
-    request: HttpRequestSpec,
-    payload: object,
-) -> HttpRequestSpec | None:
-    """Return a derived request with a Basic Authorization header when credentials exist."""
-    username, password = _extract_basic_auth_credentials(payload)
-    if username is None or password is None:
-        return None
-
-    credentials = f"{username}:{password}".encode("utf-8")
-    token = base64.b64encode(credentials).decode("ascii")
-    headers = dict(request.headers)
-    headers["Authorization"] = f"Basic {token}"
-    return HttpRequestSpec(
-        method=request.method,
-        url=request.url,
-        headers=headers,
-        body=request.body,
-    )
-
-
 class BasicAuthenticationCapability:
     """Prepare a Basic Auth Authorization header from the validated AST and context."""
+
+    def prepare_request(
+        self,
+        request: HttpRequestSpec,
+        payload: object,
+    ) -> HttpRequestSpec | None:
+        """Return a derived request with a Basic Authorization header when credentials exist."""
+        username, password = _extract_basic_auth_credentials(payload)
+        if username is None or password is None:
+            return None
+
+        credentials = f"{username}:{password}".encode("utf-8")
+        token = base64.b64encode(credentials).decode("ascii")
+        headers = dict(request.headers)
+        headers["Authorization"] = f"Basic {token}"
+        return HttpRequestSpec(
+            method=request.method,
+            url=request.url,
+            headers=headers,
+            body=request.body,
+        )
 
     def evaluate(self, validated_ast_node: object, context: SecurityContext) -> SecurityResult:
         if not isinstance(validated_ast_node, AuthenticationStatement):
@@ -143,7 +143,7 @@ class BasicAuthenticationCapability:
             )
             return SecurityResult(outcome="failed", findings=(finding,))
 
-        modified_request = prepare_basic_auth_request(request, context.payload)
+        modified_request = self.prepare_request(request, context.payload)
         if modified_request is None:
             finding = SecurityFinding(
                 capability="basic-authentication",

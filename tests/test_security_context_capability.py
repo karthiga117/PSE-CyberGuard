@@ -397,7 +397,11 @@ def test_execution_engine_applies_basic_auth_before_http_request() -> None:
             )()
             return response
 
-    base_request = HttpRequestSpec(method="GET", url="https://example.com/admin")
+    base_request = HttpRequestSpec(
+        method="GET",
+        url="https://example.com/admin",
+        headers={"X-Test": "keep-me"},
+    )
     client = RecordingHttpClient()
     engine = ExecutionEngine(
         program=Program(
@@ -439,12 +443,57 @@ def test_execution_engine_applies_basic_auth_before_http_request() -> None:
     assert execution_result.status == ExecutionStatus.SUCCESS
     assert len(client.calls) == 1
     outbound_headers = client.calls[0]["headers"]
+    assert outbound_headers["X-Test"] == "keep-me"
     assert "Authorization" in outbound_headers
     assert outbound_headers["Authorization"].startswith("Basic ")
     encoded = outbound_headers["Authorization"].split(" ", 1)[1]
     assert base64.b64decode(encoded).decode("utf-8") == "alice:s3cr3t"
     assert execution_result.request.headers == outbound_headers
-    assert base_request.headers == {}
+    assert base_request.headers == {"X-Test": "keep-me"}
+    assert "alice:s3cr3t" not in str(execution_result)
+    assert "alice:s3cr3t" not in str(execution_result.message)
+    assert "alice:s3cr3t" not in str(client.calls)
+
+
+def test_execution_engine_rejects_inconclusive_authentication() -> None:
+    class FailingHttpClient:
+        def request(self, *args, **kwargs):
+            raise AssertionError("HTTP client should not be called")
+
+    program = Program(
+        targets=(
+            TargetBlock(
+                kind="web",
+                body=(
+                    TestBlock(
+                        kind="request",
+                        body=(
+                            RequestStatement(
+                                method="GET",
+                                source_location=SourceLocation(line=1, column=1),
+                            ),
+                            AuthenticationStatement(
+                                method="bearer",
+                                source_location=SourceLocation(line=2, column=1),
+                            ),
+                        ),
+                        source_location=SourceLocation(line=1, column=1),
+                        name="unsupported-auth",
+                    ),
+                ),
+                source_location=SourceLocation(line=1, column=1),
+                url="https://example.com",
+            ),
+        ),
+        source_location=SourceLocation(line=1, column=1),
+    )
+
+    result = ExecutionEngine(program=program, http_client=FailingHttpClient()).execute()
+
+    assert result.status == ExecutionStatus.EXECUTION_ERROR
+    assert result.error == "Authentication preparation was inconclusive."
+    assert "Bearer" not in result.message
+    assert "Authorization" not in str(result)
 
 
 def test_execution_flow_invokes_security_capability_for_status_assertion() -> None:

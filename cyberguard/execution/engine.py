@@ -12,6 +12,7 @@ from cyberguard.execution.result import (
     HttpResponseCapture,
 )
 from cyberguard.parser.ast import (
+    AuthenticationStatement,
     ComparisonExpression,
     IntegerLiteral,
     Program,
@@ -20,7 +21,12 @@ from cyberguard.parser.ast import (
     TestBlock,
     WithStatement,
 )
-from cyberguard.security.capability import HttpAssertionCapability, SecurityCapability
+from cyberguard.security.capability import (
+    BasicAuthenticationCapability,
+    HttpAssertionCapability,
+    SecurityCapability,
+    prepare_basic_auth_request,
+)
 from cyberguard.security.context import SecurityContext
 
 
@@ -33,11 +39,17 @@ class ExecutionEngine:
         http_client: HttpClient | None = None,
         timeout: float = 5.0,
         security_capability: SecurityCapability | None = None,
+        authentication_capability: SecurityCapability | None = None,
+        default_security_context: SecurityContext | None = None,
     ) -> None:
         self.program = program
         self.http_client = http_client or UrllibHttpClient()
         self.timeout = timeout
         self.security_capability = security_capability or HttpAssertionCapability()
+        self.authentication_capability = (
+            authentication_capability or BasicAuthenticationCapability()
+        )
+        self.default_security_context = default_security_context
 
     def execute(
         self,
@@ -100,12 +112,36 @@ class ExecutionEngine:
         headers: dict[str, str] = {}
         request_spec = HttpRequestSpec(method=request.method, url=url, headers=headers)
 
+        auth_statement = self._find_authentication_statement(test)
+        if auth_statement is not None:
+            auth_context = self._build_security_context(
+                target_url=target_url,
+                test=getattr(test, "name", None),
+                request=request_spec,
+                capability=auth_statement.method,
+            )
+            auth_result = self.authentication_capability.evaluate(auth_statement, auth_context)
+            if auth_result.outcome == "failed":
+                return ExecutionResult(
+                    status=ExecutionStatus.EXECUTION_ERROR,
+                    target_kind="web",
+                    target_url=target_url,
+                    test_name=getattr(test, "name", None),
+                    request=request_spec,
+                    message="The HTTP request could not be prepared for basic authentication.",
+                    error="Basic authentication credentials are missing or invalid.",
+                )
+            if auth_result.outcome == "passed":
+                prepared_request = prepare_basic_auth_request(request_spec, auth_context.payload)
+                if prepared_request is not None:
+                    request_spec = prepared_request
+
         try:
             response = self.http_client.request(
-                method=request.method,
-                url=url,
-                headers=headers,
-                body=None,
+                method=request_spec.method,
+                url=request_spec.url,
+                headers=request_spec.headers,
+                body=request_spec.body,
                 timeout=self.timeout,
             )
         except Exception as exc:  # pragma: no cover - runtime wrapper behavior
@@ -200,6 +236,38 @@ class ExecutionEngine:
             if isinstance(item, RequestStatement):
                 return item
         return None
+
+    def _find_authentication_statement(self, test: TestBlock) -> AuthenticationStatement | None:
+        """Find an authentication statement in the test body."""
+        for item in test.body:
+            if isinstance(item, AuthenticationStatement):
+                return item
+        return None
+
+    def _build_security_context(
+        self,
+        *,
+        target_url: str,
+        test: str | None,
+        request: HttpRequestSpec,
+        capability: str,
+    ) -> SecurityContext:
+        """Build a runtime SecurityContext for the active capability path."""
+        base_context = self.default_security_context or SecurityContext()
+        if base_context.payload is None:
+            payload = {}
+        else:
+            payload = base_context.payload
+        return SecurityContext(
+            target=target_url,
+            test=test,
+            original_request=request,
+            capability=capability,
+            response=None,
+            execution_result=None,
+            modified_request=request,
+            payload=payload,
+        )
 
     def _find_status_assertion(self, test: TestBlock) -> ComparisonExpression | None:
         """Locate a status comparison assertion in the test body."""

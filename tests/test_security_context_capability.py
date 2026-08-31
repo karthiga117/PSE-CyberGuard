@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import FrozenInstanceError
 
 import pytest
@@ -328,6 +329,122 @@ def test_basic_authentication_capability_requires_credentials() -> None:
 
     assert result.outcome == "failed"
     assert result.findings[0].outcome == "failed"
+
+
+def test_basic_authentication_capability_rejects_wrong_ast_type() -> None:
+    capability = BasicAuthenticationCapability()
+    context = SecurityContext(
+        target="https://example.com",
+        test="secure-admin",
+        original_request=HttpRequestSpec(method="GET", url="https://example.com/admin"),
+        payload={"username": "alice", "password": "s3cr3t"},
+    )
+
+    result = capability.evaluate(
+        RequestStatement(method="GET", source_location=SourceLocation(1, 1)),
+        context,
+    )
+
+    assert result.outcome == "inconclusive"
+    assert result.findings == ()
+
+
+def test_basic_authentication_capability_rejects_non_basic_method() -> None:
+    capability = BasicAuthenticationCapability()
+    statement = AuthenticationStatement(
+        method="bearer",
+        source_location=SourceLocation(line=1, column=1),
+    )
+    context = SecurityContext(
+        target="https://example.com",
+        test="secure-admin",
+        original_request=HttpRequestSpec(method="GET", url="https://example.com/admin"),
+        payload={"username": "alice", "password": "s3cr3t"},
+    )
+
+    result = capability.evaluate(statement, context)
+
+    assert result.outcome == "inconclusive"
+    assert result.findings == ()
+
+
+def test_execution_engine_applies_basic_auth_before_http_request() -> None:
+    from cyberguard.execution.http_client import HttpClient
+
+    class RecordingHttpClient(HttpClient):
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        def request(self, method, url, headers=None, body=None, timeout=5.0):
+            self.calls.append(
+                {
+                    "method": method,
+                    "url": url,
+                    "headers": dict(headers or {}),
+                    "body": body,
+                    "timeout": timeout,
+                }
+            )
+            response = type(
+                "Response",
+                (),
+                {
+                    "status_code": 200,
+                    "headers": {"content-type": "application/json"},
+                    "body": '{"ok": true}',
+                    "url": url,
+                },
+            )()
+            return response
+
+    base_request = HttpRequestSpec(method="GET", url="https://example.com/admin")
+    client = RecordingHttpClient()
+    engine = ExecutionEngine(
+        program=Program(
+            targets=(
+                TargetBlock(
+                    kind="web",
+                    body=(
+                        TestBlock(
+                            kind="request",
+                            body=(
+                                RequestStatement(
+                                    method="GET",
+                                    source_location=SourceLocation(line=1, column=1),
+                                    path="/admin",
+                                ),
+                                AuthenticationStatement(
+                                    method="basic",
+                                    source_location=SourceLocation(line=2, column=1),
+                                ),
+                            ),
+                            source_location=SourceLocation(line=1, column=1),
+                            name="secure-admin",
+                        ),
+                    ),
+                    source_location=SourceLocation(line=1, column=1),
+                    url="https://example.com",
+                ),
+            ),
+            source_location=SourceLocation(line=1, column=1),
+        ),
+        http_client=client,
+        default_security_context=SecurityContext(
+            payload={"username": "alice", "password": "s3cr3t"},
+            original_request=base_request,
+        ),
+    )
+
+    execution_result = engine.execute()
+    assert execution_result.status == ExecutionStatus.SUCCESS
+    assert len(client.calls) == 1
+    outbound_headers = client.calls[0]["headers"]
+    assert "Authorization" in outbound_headers
+    assert outbound_headers["Authorization"].startswith("Basic ")
+    encoded = outbound_headers["Authorization"].split(" ", 1)[1]
+    assert base64.b64decode(encoded).decode("utf-8") == "alice:s3cr3t"
+    assert execution_result.request.headers == outbound_headers
+    assert base_request.headers == {}
 
 
 def test_execution_flow_invokes_security_capability_for_status_assertion() -> None:

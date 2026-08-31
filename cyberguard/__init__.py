@@ -20,10 +20,13 @@ from .security import (
     BasicAuthCapability,
     BasicAuthenticationCapability,
     HttpAssertionCapability,
+    InjectionCapability,
     SecurityCapability,
     SecurityContext,
     SecurityFinding,
     SecurityResult,
+    SQLInjectionCapability,
+    SqlInjectionCapability,
 )
 from .semantic import SemanticError, SemanticValidator
 
@@ -41,8 +44,11 @@ __all__ = [
     "BasicAuthCapability",
     "BasicAuthenticationCapability",
     "HttpAssertionCapability",
+    "InjectionCapability",
     "SecurityCapability",
     "SecurityContext",
     "SecurityFinding",
     "SecurityResult",
+    "SQLInjectionCapability",
+    "SqlInjectionCapability",
 ]

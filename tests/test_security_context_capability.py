@@ -16,12 +16,14 @@ from cyberguard import (
     HttpAssertionCapability,
     SecurityCapability,
     SecurityContext,
+    SqlInjectionCapability,
 )
 from cyberguard.execution.result import HttpRequestSpec, HttpResponseCapture
 from cyberguard.parser.ast import (
     AuthenticationStatement,
     ComparisonExpression,
     IdentifierValue,
+    InjectionStatement,
     IntegerLiteral,
     Program,
     RequestStatement,
@@ -292,6 +294,58 @@ def test_http_assertion_capability_requires_response() -> None:
 
     assert result.outcome == "inconclusive"
     assert result.findings == ()
+
+
+def test_sql_injection_capability_accepts_sql_ast_without_running_payloads() -> None:
+    capability = SqlInjectionCapability()
+    statement = InjectionStatement(
+        kind="sql",
+        source_location=SourceLocation(line=1, column=1),
+    )
+    context = SecurityContext(
+        target="https://example.com",
+        test="inject-sql",
+        original_request=HttpRequestSpec(method="GET", url="https://example.com/login"),
+    )
+
+    result = capability.evaluate(statement, context)
+
+    assert result.outcome == "inconclusive"
+    assert result.findings == ()
+
+
+def test_sql_injection_capability_rejects_non_sql_kind() -> None:
+    capability = SqlInjectionCapability()
+    statement = InjectionStatement(
+        kind="xss",
+        source_location=SourceLocation(line=1, column=1),
+    )
+    context = SecurityContext(
+        target="https://example.com",
+        test="inject-xss",
+        original_request=HttpRequestSpec(method="GET", url="https://example.com/login"),
+    )
+
+    result = capability.evaluate(statement, context)
+
+    assert result.outcome == "inconclusive"
+    assert result.findings == ()
+
+
+def test_sql_injection_capability_preserves_original_request() -> None:
+    capability = SqlInjectionCapability()
+    original = HttpRequestSpec(
+        method="POST",
+        url="https://example.com/login",
+        headers={"Content-Type": "application/json"},
+        body='{"user":"alice"}',
+    )
+    derived = capability.prepare_request(original)
+
+    assert derived is not None
+    assert derived == original
+    assert original.headers == {"Content-Type": "application/json"}
+    assert original.body == '{"user":"alice"}'
 
 
 def test_basic_authentication_capability_prepares_authorization_header() -> None:

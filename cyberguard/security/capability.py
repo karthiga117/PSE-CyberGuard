@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from cyberguard.execution.result import HttpRequestSpec
 from cyberguard.parser.ast import (
@@ -19,12 +19,23 @@ from .finding import SecurityFinding
 from .result import SecurityResult
 
 
+@runtime_checkable
 class SecurityCapability(Protocol):
     def evaluate(
         self,
         validated_ast_node: object,
         context: SecurityContext,
     ) -> SecurityResult:
+        ...
+
+
+@runtime_checkable
+class AuthenticationCapability(SecurityCapability, Protocol):
+    def prepare_request(
+        self,
+        request: HttpRequestSpec,
+        payload: object,
+    ) -> HttpRequestSpec | None:
         ...
 
 
@@ -143,29 +154,6 @@ class BasicAuthenticationCapability:
             )
             return SecurityResult(outcome="failed", findings=(finding,))
 
-        modified_request = self.prepare_request(request, context.payload)
-        if modified_request is None:
-            finding = SecurityFinding(
-                capability="basic-authentication",
-                target=context.target or "unknown",
-                test=context.test or "unknown",
-                evidence={
-                    "request": {"method": request.method, "url": request.url},
-                    "reason": "missing basic authentication credentials",
-                },
-                outcome="failed",
-                rule="authentication",
-                severity="warning",
-                title="Basic authentication credentials missing",
-                description=(
-                    "The Basic Authentication capability requires credentials in "
-                    "the SecurityContext payload."
-                ),
-                expected="username and password",
-                actual=None,
-            )
-            return SecurityResult(outcome="failed", findings=(finding,))
-
         finding = SecurityFinding(
             capability="basic-authentication",
             target=context.target or "unknown",
@@ -176,9 +164,9 @@ class BasicAuthenticationCapability:
                     "url": request.url,
                     "headers": {"Authorization": "Basic [REDACTED]"},
                 },
-                "modified_request": {
-                    "method": modified_request.method,
-                    "url": modified_request.url,
+                "prepared_request": {
+                    "method": request.method,
+                    "url": request.url,
                     "headers": {"Authorization": "Basic [REDACTED]"},
                 },
             },

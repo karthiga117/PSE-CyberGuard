@@ -8,6 +8,7 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from cyberguard import (
+    AuthenticationCapability,
     BasicAuthenticationCapability,
     ExecutionEngine,
     ExecutionResult,
@@ -329,6 +330,13 @@ def test_basic_authentication_capability_requires_credentials() -> None:
 
     assert result.outcome == "failed"
     assert result.findings[0].outcome == "failed"
+
+
+def test_basic_authentication_capability_matches_authentication_contract() -> None:
+    capability = BasicAuthenticationCapability()
+
+    assert isinstance(capability, AuthenticationCapability)
+    assert isinstance(capability, SecurityCapability)
 
 
 def test_basic_authentication_capability_rejects_wrong_ast_type() -> None:

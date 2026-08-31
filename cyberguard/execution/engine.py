@@ -22,6 +22,7 @@ from cyberguard.parser.ast import (
     WithStatement,
 )
 from cyberguard.security.capability import (
+    AuthenticationCapability,
     BasicAuthenticationCapability,
     HttpAssertionCapability,
     SecurityCapability,
@@ -38,7 +39,7 @@ class ExecutionEngine:
         http_client: HttpClient | None = None,
         timeout: float = 5.0,
         security_capability: SecurityCapability | None = None,
-        authentication_capability: SecurityCapability | None = None,
+        authentication_capability: AuthenticationCapability | None = None,
         default_security_context: SecurityContext | None = None,
     ) -> None:
         self.program = program

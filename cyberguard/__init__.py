@@ -16,6 +16,7 @@ __license__ = "MIT"
 from .execution import ExecutionEngine, ExecutionResult, ExecutionStatus
 from .execution.http_client import HttpClient, HttpResponse, UrllibHttpClient
 from .security import (
+    AuthenticationCapability,
     BasicAuthCapability,
     BasicAuthenticationCapability,
     HttpAssertionCapability,
@@ -36,6 +37,7 @@ __all__ = [
     "HttpClient",
     "HttpResponse",
     "UrllibHttpClient",
+    "AuthenticationCapability",
     "BasicAuthCapability",
     "BasicAuthenticationCapability",
     "HttpAssertionCapability",

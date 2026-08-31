@@ -7,6 +7,7 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from cyberguard import (
+    BasicAuthenticationCapability,
     ExecutionEngine,
     ExecutionResult,
     ExecutionStatus,
@@ -16,6 +17,7 @@ from cyberguard import (
 )
 from cyberguard.execution.result import HttpRequestSpec, HttpResponseCapture
 from cyberguard.parser.ast import (
+    AuthenticationStatement,
     ComparisonExpression,
     IdentifierValue,
     IntegerLiteral,
@@ -288,6 +290,44 @@ def test_http_assertion_capability_requires_response() -> None:
 
     assert result.outcome == "inconclusive"
     assert result.findings == ()
+
+
+def test_basic_authentication_capability_prepares_authorization_header() -> None:
+    capability = BasicAuthenticationCapability()
+    statement = AuthenticationStatement(
+        method="basic",
+        source_location=SourceLocation(line=1, column=1),
+    )
+    context = SecurityContext(
+        target="https://example.com",
+        test="secure-admin",
+        original_request=HttpRequestSpec(method="GET", url="https://example.com/admin"),
+        payload={"username": "alice", "password": "s3cr3t"},
+    )
+
+    result = capability.evaluate(statement, context)
+
+    assert result.outcome == "passed"
+    assert result.findings[0].rule == "authentication"
+    assert result.findings[0].actual == "Basic [REDACTED]"
+
+
+def test_basic_authentication_capability_requires_credentials() -> None:
+    capability = BasicAuthenticationCapability()
+    statement = AuthenticationStatement(
+        method="basic",
+        source_location=SourceLocation(line=1, column=1),
+    )
+    context = SecurityContext(
+        target="https://example.com",
+        test="secure-admin",
+        original_request=HttpRequestSpec(method="GET", url="https://example.com/admin"),
+    )
+
+    result = capability.evaluate(statement, context)
+
+    assert result.outcome == "failed"
+    assert result.findings[0].outcome == "failed"
 
 
 def test_execution_flow_invokes_security_capability_for_status_assertion() -> None:

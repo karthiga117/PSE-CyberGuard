@@ -7,6 +7,7 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from cyberguard import (
+    ExecutionEngine,
     ExecutionResult,
     ExecutionStatus,
     HttpAssertionCapability,
@@ -18,10 +19,15 @@ from cyberguard.parser.ast import (
     ComparisonExpression,
     IdentifierValue,
     IntegerLiteral,
+    Program,
     RequestStatement,
     SourceLocation,
+    TargetBlock,
+    TestBlock,
+    WithStatement,
 )
 from cyberguard.security import SecurityFinding, SecurityResult
+from cyberguard.status import compare_status
 
 
 class FakeCapability:
@@ -166,7 +172,7 @@ def test_security_context_is_frozen() -> None:
         context.target = "https://other.example.com"
 
 
-def test_http_assertion_capability_supports_execute_contract() -> None:
+def test_http_assertion_capability_status_equals_passes() -> None:
     capability = HttpAssertionCapability()
     comparison = ComparisonExpression(
         left=IdentifierValue(
@@ -186,9 +192,206 @@ def test_http_assertion_capability_supports_execute_contract() -> None:
         response=HttpResponseCapture(status_code=200, headers={}, body="ok"),
     )
 
-    result = capability.execute(comparison, context)
+    result = capability.evaluate(comparison, context)
 
     assert result.outcome == "passed"
-    assert result.passed is True
     assert result.findings[0].outcome == "passed"
     assert result.findings[0].actual == 200
+
+
+def test_http_assertion_capability_status_equals_fails() -> None:
+    capability = HttpAssertionCapability()
+    comparison = ComparisonExpression(
+        left=IdentifierValue(
+            name="status",
+            source_location=SourceLocation(line=1, column=1),
+        ),
+        operator="==",
+        right=IntegerLiteral(
+            value=200,
+            source_location=SourceLocation(line=1, column=8),
+        ),
+        source_location=SourceLocation(line=1, column=1),
+    )
+    context = SecurityContext(
+        target="https://example.com",
+        test="status == 200",
+        response=HttpResponseCapture(status_code=404, headers={}, body="not found"),
+    )
+
+    result = capability.evaluate(comparison, context)
+
+    assert result.outcome == "failed"
+    assert result.findings[0].severity == "warning"
+    assert result.findings[0].actual == 404
+
+
+@pytest.mark.parametrize(
+    ("operator", "expected", "actual", "expected_outcome"),
+    [
+        ("==", 200, 200, "passed"),
+        ("==", 200, 403, "failed"),
+        ("!=", 500, 200, "passed"),
+        ("!=", 500, 500, "failed"),
+    ],
+)
+def test_http_assertion_capability_status_matrix(
+    operator: str,
+    expected: int,
+    actual: int,
+    expected_outcome: str,
+) -> None:
+    capability = HttpAssertionCapability()
+    comparison = ComparisonExpression(
+        left=IdentifierValue(
+            name="status",
+            source_location=SourceLocation(line=1, column=1),
+        ),
+        operator=operator,
+        right=IntegerLiteral(
+            value=expected,
+            source_location=SourceLocation(line=1, column=8),
+        ),
+        source_location=SourceLocation(line=1, column=1),
+    )
+
+    result = capability.evaluate(
+        comparison,
+        SecurityContext(
+            response=HttpResponseCapture(status_code=actual, headers={}, body="ok")
+        ),
+    )
+
+    assert result.outcome == expected_outcome
+    assert result.findings[0].actual == actual
+
+
+def test_http_assertion_capability_requires_response() -> None:
+    capability = HttpAssertionCapability()
+    comparison = ComparisonExpression(
+        left=IdentifierValue(
+            name="status",
+            source_location=SourceLocation(line=1, column=1),
+        ),
+        operator="==",
+        right=IntegerLiteral(
+            value=200,
+            source_location=SourceLocation(line=1, column=8),
+        ),
+        source_location=SourceLocation(line=1, column=1),
+    )
+
+    result = capability.evaluate(
+        comparison,
+        SecurityContext(target="https://example.com", test="status == 200"),
+    )
+
+    assert result.outcome == "inconclusive"
+    assert result.findings == ()
+
+
+def test_execution_flow_invokes_security_capability_for_status_assertion() -> None:
+    from cyberguard.execution.http_client import HttpClient
+
+    class StaticHttpClient(HttpClient):
+        def request(self, method, url, headers=None, body=None, timeout=5.0):
+            response = type(
+                "Response",
+                (),
+                {
+                    "status_code": 200,
+                    "headers": {"content-type": "application/json"},
+                    "body": '{"ok": true}',
+                    "url": url,
+                },
+            )()
+            return response
+
+    class RecordingSecurityCapability:
+        def __init__(self) -> None:
+            self.calls: list[tuple[object, SecurityContext]] = []
+
+        def evaluate(self, validated_ast_node: object, context: SecurityContext) -> SecurityResult:
+            self.calls.append((validated_ast_node, context))
+            assert isinstance(validated_ast_node, ComparisonExpression)
+            assert isinstance(context.response, HttpResponseCapture)
+            expected = int(validated_ast_node.right.value)
+            actual = context.response.status_code
+            outcome = (
+                "passed"
+                if compare_status(actual, expected, validated_ast_node.operator)
+                else "failed"
+            )
+            return SecurityResult(
+                outcome=outcome,
+                findings=(
+                    SecurityFinding(
+                        capability="http-assertion",
+                        target=context.target or "unknown",
+                        test=context.test or "unknown",
+                        evidence={
+                            "expected": expected,
+                            "actual": actual,
+                            "operator": validated_ast_node.operator,
+                        },
+                        outcome=outcome,
+                        rule="status",
+                        severity="info" if outcome == "passed" else "warning",
+                        expected=expected,
+                        actual=actual,
+                    )
+                ),
+            )
+
+    comparison = ComparisonExpression(
+        left=IdentifierValue(
+            name="status",
+            source_location=SourceLocation(line=1, column=1),
+        ),
+        operator="==",
+        right=IntegerLiteral(
+            value=200,
+            source_location=SourceLocation(line=1, column=8),
+        ),
+        source_location=SourceLocation(line=1, column=1),
+    )
+    target = TargetBlock(
+        kind="web",
+        body=(
+            TestBlock(
+                kind="request",
+                body=(
+                    RequestStatement(
+                        method="GET",
+                        source_location=SourceLocation(line=1, column=1),
+                    ),
+                    WithStatement(
+                        expression=comparison,
+                        source_location=SourceLocation(line=1, column=1),
+                    ),
+                ),
+                source_location=SourceLocation(line=1, column=1),
+                name="request",
+            ),
+        ),
+        source_location=SourceLocation(line=1, column=1),
+        url="https://example.com",
+    )
+    program = Program(targets=(target,), source_location=SourceLocation(line=1, column=1))
+    capability = RecordingSecurityCapability()
+
+    execution_result = ExecutionEngine(
+        program=program,
+        http_client=StaticHttpClient(),
+        security_capability=capability,
+    ).execute()
+
+    assert execution_result.status == ExecutionStatus.SUCCESS
+    assert len(capability.calls) == 1
+    evaluated_ast_node, context = capability.calls[0]
+    assert evaluated_ast_node is comparison
+    assert context.target == "https://example.com"
+    assert context.response is not None
+    assert context.response.status_code == 200
+    assert execution_result.expected == 200
+    assert execution_result.actual == 200

@@ -1,6 +1,6 @@
 """Security result models for CyberGuard."""
 
-from .capability import HttpAssertionCapability, SecurityCapability, compare_status
+from .capability import HttpAssertionCapability, SecurityCapability
 from .context import SecurityContext
 from .finding import SecurityFinding
 from .result import SecurityResult
@@ -11,5 +11,4 @@ __all__ = [
     "SecurityContext",
     "SecurityFinding",
     "SecurityResult",
-    "compare_status",
 ]

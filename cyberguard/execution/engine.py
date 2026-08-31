@@ -20,7 +20,8 @@ from cyberguard.parser.ast import (
     TestBlock,
     WithStatement,
 )
-from cyberguard.security.capability import compare_status
+from cyberguard.security.capability import HttpAssertionCapability, SecurityCapability
+from cyberguard.security.context import SecurityContext
 
 
 class ExecutionEngine:
@@ -31,10 +32,12 @@ class ExecutionEngine:
         program: Program | None = None,
         http_client: HttpClient | None = None,
         timeout: float = 5.0,
+        security_capability: SecurityCapability | None = None,
     ) -> None:
         self.program = program
         self.http_client = http_client or UrllibHttpClient()
         self.timeout = timeout
+        self.security_capability = security_capability or HttpAssertionCapability()
 
     def execute(
         self,
@@ -135,10 +138,18 @@ class ExecutionEngine:
                 message="Request executed successfully; no assertions were configured.",
             )
 
-        expected = assertion[1]
+        security_context = SecurityContext(
+            target=target_url,
+            test=getattr(test, "name", None),
+            original_request=request_spec,
+            capability="http-assertion",
+            response=response_capture,
+        )
+        security_result = self.security_capability.evaluate(assertion, security_context)
+
+        expected = int(assertion.right.value)
         actual = response.status_code
-        passed = self._compare_status(actual, expected, assertion[0])
-        if passed:
+        if security_result.outcome == "passed":
             return ExecutionResult(
                 status=ExecutionStatus.SUCCESS,
                 target_kind="web",
@@ -151,9 +162,24 @@ class ExecutionEngine:
                 actual=actual,
                 message=f"Expected status: {expected}; Actual status: {actual}",
             )
+        if security_result.outcome == "failed":
+            return ExecutionResult(
+                status=ExecutionStatus.ASSERTION_FAILURE,
+                target_kind="web",
+                target_url=target_url,
+                test_name=getattr(test, "name", None),
+                request=request_spec,
+                response=response_capture,
+                assertion="status",
+                expected=expected,
+                actual=actual,
+                message=f"Expected status: {expected}; Actual status: {actual}",
+            )
 
+        # ExecutionStatus has no inconclusive state; preserving the current
+        # compatibility behavior is intentional for an indeterminate security result.
         return ExecutionResult(
-            status=ExecutionStatus.ASSERTION_FAILURE,
+            status=ExecutionStatus.SUCCESS,
             target_kind="web",
             target_url=target_url,
             test_name=getattr(test, "name", None),
@@ -162,7 +188,10 @@ class ExecutionEngine:
             assertion="status",
             expected=expected,
             actual=actual,
-            message=f"Expected status: {expected}; Actual status: {actual}",
+            message=(
+                "HTTP status assertion was inconclusive; the security "
+                "capability returned no definitive result."
+            ),
         )
 
     def _find_request(self, test: TestBlock) -> RequestStatement | None:
@@ -172,7 +201,7 @@ class ExecutionEngine:
                 return item
         return None
 
-    def _find_status_assertion(self, test: TestBlock) -> tuple[str, int] | None:
+    def _find_status_assertion(self, test: TestBlock) -> ComparisonExpression | None:
         """Locate a status comparison assertion in the test body."""
         for item in test.body:
             expr = None
@@ -187,12 +216,8 @@ class ExecutionEngine:
                 continue
             if not isinstance(expr.right, IntegerLiteral):
                 continue
-            return expr.operator, int(expr.right.value)
+            return expr
         return None
-
-    def _compare_status(self, actual: int, expected: int, operator: str) -> bool:
-        """Compare status code values using the supported operators."""
-        return compare_status(actual, expected, operator)
 
     def _build_url(self, base_url: str, path: str | None) -> str:
         """Construct the runtime URL from the target URL and request path."""

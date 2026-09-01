@@ -8,6 +8,11 @@ from .capability import (
     SecurityCapability,
 )
 from .context import SecurityContext
+from .detection import (
+    DetectionCapability,
+    SqlDetectionCapability,
+    SqlErrorDetectionCapability,
+)
 from .finding import SecurityFinding
 from .injection import InjectionCapability, SQLInjectionCapability, SqlInjectionCapability
 from .result import SecurityResult
@@ -16,6 +21,7 @@ __all__ = [
     "AuthenticationCapability",
     "BasicAuthCapability",
     "BasicAuthenticationCapability",
+    "DetectionCapability",
     "HttpAssertionCapability",
     "InjectionCapability",
     "SecurityCapability",
@@ -23,5 +29,7 @@ __all__ = [
     "SecurityFinding",
     "SecurityResult",
     "SQLInjectionCapability",
+    "SqlDetectionCapability",
+    "SqlErrorDetectionCapability",
     "SqlInjectionCapability",
 ]

@@ -14,6 +14,7 @@ from cyberguard.execution.result import (
 from cyberguard.parser.ast import (
     AuthenticationStatement,
     ComparisonExpression,
+    DetectionStatement,
     IntegerLiteral,
     Program,
     RequestStatement,
@@ -28,6 +29,7 @@ from cyberguard.security.capability import (
     SecurityCapability,
 )
 from cyberguard.security.context import SecurityContext
+from cyberguard.security.detection import DetectionCapability, SqlErrorDetectionCapability
 
 
 class ExecutionEngine:
@@ -40,6 +42,7 @@ class ExecutionEngine:
         timeout: float = 5.0,
         security_capability: SecurityCapability | None = None,
         authentication_capability: AuthenticationCapability | None = None,
+        detection_capability: DetectionCapability | None = None,
         default_security_context: SecurityContext | None = None,
     ) -> None:
         self.program = program
@@ -49,6 +52,7 @@ class ExecutionEngine:
         self.authentication_capability = (
             authentication_capability or BasicAuthenticationCapability()
         )
+        self.detection_capability = detection_capability or SqlErrorDetectionCapability()
         self.default_security_context = default_security_context
 
     def execute(
@@ -192,6 +196,25 @@ class ExecutionEngine:
             url=response.url,
         )
 
+        detection_statement = self._find_detection_statement(test)
+        if detection_statement is not None:
+            detection_context = SecurityContext(
+                target=target_url,
+                test=getattr(test, "name", None),
+                original_request=request_spec,
+                capability="sql-error-detection",
+                response=response_capture,
+                execution_result=ExecutionResult(
+                    status=ExecutionStatus.SUCCESS,
+                    target_kind="web",
+                    target_url=target_url,
+                    test_name=getattr(test, "name", None),
+                    request=request_spec,
+                    response=response_capture,
+                ),
+            )
+            self.detection_capability.evaluate(detection_statement, detection_context)
+
         assertion = self._find_status_assertion(test)
         if assertion is None:
             return ExecutionResult(
@@ -298,6 +321,13 @@ class ExecutionEngine:
             modified_request=request,
             payload=payload,
         )
+
+    def _find_detection_statement(self, test: TestBlock) -> DetectionStatement | None:
+        """Locate the supported `detect: sql-error` statement in a test body."""
+        for item in test.body:
+            if isinstance(item, DetectionStatement):
+                return item
+        return None
 
     def _find_status_assertion(self, test: TestBlock) -> ComparisonExpression | None:
         """Locate a status comparison assertion in the test body."""

@@ -7,6 +7,7 @@ from .capability import (
     HttpAssertionCapability,
     SecurityCapability,
 )
+from .cloud import CloudCapability, CloudInspectionCapability, CloudSecurityCapability
 from .context import SecurityContext
 from .detection import (
     DetectionCapability,
@@ -21,6 +22,9 @@ __all__ = [
     "AuthenticationCapability",
     "BasicAuthCapability",
     "BasicAuthenticationCapability",
+    "CloudCapability",
+    "CloudInspectionCapability",
+    "CloudSecurityCapability",
     "DetectionCapability",
     "HttpAssertionCapability",
     "InjectionCapability",

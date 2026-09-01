@@ -58,6 +58,20 @@ target: web
         assert isinstance(test.body[0], RequestStatement)
         assert test.body[0].method == "GET"
 
+    def test_request_with_path(self) -> None:
+        """Test request statements with an HTTP path."""
+        source = """\
+target: web
+    test: request
+        request: GET /health
+"""
+        prog = parse(source)
+
+        request = prog.targets[0].body[0].body[0]
+        assert isinstance(request, RequestStatement)
+        assert request.method == "GET"
+        assert request.path == "/health"
+
     def test_web_target_with_all_statements(self) -> None:
         """Test web target with all optional test statements."""
         source = """\

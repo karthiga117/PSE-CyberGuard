@@ -1,0 +1,4 @@
+target: web
+test: login_check
+request: GET /login
+with: status != 500

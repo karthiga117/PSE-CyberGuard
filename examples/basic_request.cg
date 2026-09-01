@@ -1,0 +1,5 @@
+# Basic HTTP request
+target: web
+test: health_check
+request: GET /health
+with: status == 200

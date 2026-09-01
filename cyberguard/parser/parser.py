@@ -262,7 +262,12 @@ class Parser:
 
         self._advance()
 
-        return RequestStatement(method=method, source_location=start_loc)
+        path = None
+        if self._check(TokenType.PATH):
+            path = self._current().value
+            self._advance()
+
+        return RequestStatement(method=method, path=path, source_location=start_loc)
 
     def _parse_authentication_statement(self) -> AuthenticationStatement:
         """Parse an authentication statement."""

@@ -1,4 +1,4 @@
 target: web
-test: login_check
-request: GET /login
-with: status != 500
+    test: request
+        request: GET /login
+        with: status != 500

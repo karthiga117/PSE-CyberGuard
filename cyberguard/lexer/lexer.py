@@ -146,6 +146,19 @@ class Lexer:
                     )
                 )
                 continue
+            if ch == "/":
+                start = index
+                while index < len(text) and not text[index].isspace():
+                    index += 1
+                tokens.append(
+                    Token(
+                        TokenType.PATH,
+                        text[start:index],
+                        line_number,
+                        start_column + start,
+                    )
+                )
+                continue
             if ch.isalpha() or ch == "_":
                 start = index
                 while index < len(text) and (text[index].isalnum() or text[index] == "_"):

@@ -12,6 +12,7 @@ class TokenType(str, Enum):
     KEYWORD = "KEYWORD"
     IDENTIFIER = "IDENTIFIER"
     STRING = "STRING"
+    PATH = "PATH"
     INTEGER = "INTEGER"
     OPERATOR = "OPERATOR"
     NEWLINE = "NEWLINE"

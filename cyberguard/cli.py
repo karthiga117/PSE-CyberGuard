@@ -101,14 +101,7 @@ def run(
         source = file_path.read_text(encoding="utf-8")
         program = Parser(Lexer(source).tokenize()).parse()
     except Exception as exc:  # pragma: no cover - exercised via CLI errors
-        typer.echo("✗ Parse failed")
-        typer.echo(f"  {exc}")
-        raise typer.Exit(code=1) from exc
-
-    try:
-        SemanticValidator().validate(program)
-    except Exception as exc:  # pragma: no cover - exercised via CLI errors
-        typer.echo("✗ Semantic validation failed")
+        typer.echo("x Parse failed")
         typer.echo(f"  {exc}")
         raise typer.Exit(code=1) from exc
 
@@ -121,6 +114,13 @@ def run(
                 targets.append(target)
         program = replace(program, targets=tuple(targets))
 
+        SemanticValidator().validate(program)
+    except Exception as exc:  # pragma: no cover - exercised via CLI errors
+        typer.echo("x Semantic validation failed")
+        typer.echo(f"  {exc}")
+        raise typer.Exit(code=1) from exc
+
+    try:
         result = ExecutionEngine(program=program, http_client=UrllibHttpClient()).execute()
         results = result if isinstance(result, list) else [result]
         for item in results:
@@ -128,7 +128,7 @@ def run(
             if getattr(item, "failed", False):
                 raise typer.Exit(code=1)
     except Exception as exc:  # pragma: no cover - exercised via CLI errors
-        typer.echo("✗ Execution failed")
+        typer.echo("x Execution failed")
         typer.echo(f"  {exc}")
         raise typer.Exit(code=1) from exc
 

@@ -28,8 +28,8 @@ __all__ = [
     "SecurityContext",
     "SecurityFinding",
     "SecurityResult",
-    "SQLInjectionCapability",
     "SqlDetectionCapability",
     "SqlErrorDetectionCapability",
+    "SQLInjectionCapability",
     "SqlInjectionCapability",
 ]

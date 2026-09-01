@@ -26,9 +26,9 @@ from .security import (
     SecurityContext,
     SecurityFinding,
     SecurityResult,
-    SQLInjectionCapability,
     SqlDetectionCapability,
     SqlErrorDetectionCapability,
+    SQLInjectionCapability,
     SqlInjectionCapability,
 )
 from .semantic import SemanticError, SemanticValidator
@@ -53,8 +53,8 @@ __all__ = [
     "SecurityContext",
     "SecurityFinding",
     "SecurityResult",
-    "SQLInjectionCapability",
     "SqlDetectionCapability",
     "SqlErrorDetectionCapability",
+    "SQLInjectionCapability",
     "SqlInjectionCapability",
 ]

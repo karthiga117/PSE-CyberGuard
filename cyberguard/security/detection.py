@@ -5,6 +5,10 @@ project does not define the response-analysis rules needed to make a concrete
 SQL-error detection decision. This capability therefore accepts the validated AST
 node and keeps the result non-conclusive instead of inventing unsupported regex,
 status semantics, or vulnerability findings.
+
+The evaluation is intentionally limited to a `SecurityResult` for the capability
+layer. It is not projected into `ExecutionResult` because the design does not
+currently define a mapping from detection evidence to transport execution status.
 """
 
 from __future__ import annotations

@@ -211,6 +211,10 @@ class ExecutionEngine:
                     test_name=getattr(test, "name", None),
                     request=request_spec,
                     response=response_capture,
+                    message=(
+                        "Request executed successfully; "
+                        "detection evaluation is non-projecting."
+                    ),
                 ),
             )
             self.detection_capability.evaluate(detection_statement, detection_context)
@@ -323,7 +327,7 @@ class ExecutionEngine:
         )
 
     def _find_detection_statement(self, test: TestBlock) -> DetectionStatement | None:
-        """Locate the supported `detect: sql-error` statement in a test body."""
+        """Locate a supported detection statement in the test body."""
         for item in test.body:
             if isinstance(item, DetectionStatement):
                 return item
